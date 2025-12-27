@@ -11,6 +11,7 @@ import EquipmentPage from "./pages/EquipmentPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import ManagementPage from "./pages/ManagementPage";
+import WorkCentersPage from "./pages/WorkCentersPage";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import NotFound from "./pages/NotFound";
@@ -65,6 +66,11 @@ const App = () => (
             <Route path="/management" element={
               <ProtectedRoute>
                 <ManagementPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/work-centers" element={
+              <ProtectedRoute>
+                <WorkCentersPage />
               </ProtectedRoute>
             } />
 

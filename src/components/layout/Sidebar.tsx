@@ -11,12 +11,14 @@ import {
   Settings,
   LogOut,
   Wrench,
+  Factory,
 } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/requests', icon: Kanban, label: 'Requests' },
   { to: '/equipment', icon: Box, label: 'Equipment' },
+  { to: '/work-centers', icon: Factory, label: 'Work Centers' },
   { to: '/calendar', icon: Calendar, label: 'Calendar' },
 ];
 
