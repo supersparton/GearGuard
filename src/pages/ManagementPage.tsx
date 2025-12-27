@@ -668,26 +668,8 @@ export default function ManagementPage() {
     const { data: teams = [], isLoading: teamsLoading, refetch: refetchTeams } = useTeams();
     const { data: categories = [], isLoading: categoriesLoading, refetch: refetchCategories } = useCategories();
 
-    const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
 
-    if (!isAdminOrManager) {
-        return (
-            <Layout>
-                <div className="flex h-full items-center justify-center">
-                    <div className="text-center">
-                        <Settings2 className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h2 className="mt-4 text-xl font-semibold">Access Restricted</h2>
-                        <p className="mt-2 text-muted-foreground">
-                            Only admins and managers can access this page.
-                        </p>
-                        <Button onClick={() => navigate('/')} className="mt-4">
-                            Back to Dashboard
-                        </Button>
-                    </div>
-                </div>
-            </Layout>
-        );
-    }
+    // Everyone can now access this page
 
     return (
         <Layout>
