@@ -24,21 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        console.warn('Auth loading timeout - forcing load complete');
-        setLoading(false);
-      }
-    }, 5000);
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session?.user?.email || 'No session');
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user);
       } else {
         setLoading(false);
       }
@@ -54,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user);
         } else {
           setProfile(null);
           setLoading(false);
@@ -63,44 +55,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
-      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (authUser: User) => {
     try {
-      console.log('Fetching profile for:', userId);
+      console.log('Fetching profile for:', authUser.id);
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', authUser.id)
         .single();
 
       if (error) {
-        console.error('Profile fetch error:', error);
-        // If profile doesn't exist yet, create a minimal one from user metadata
-        const user = (await supabase.auth.getUser()).data.user;
-        if (user) {
-          setProfile({
-            id: user.id,
-            first_name: user.user_metadata?.first_name || null,
-            last_name: user.user_metadata?.last_name || null,
-            email: user.email || null,
-            role: 'technician',
-            department: user.user_metadata?.department || null,
-            phone: user.user_metadata?.phone || null,
-            avatar_url: null,
-            created_at: user.created_at,
-            updated_at: user.created_at,
-          } as Profile);
-        }
+        console.warn('Profile fetch failed (RLS?):', error.message);
+        // Create fallback profile from user metadata
+        const fallbackProfile = {
+          id: authUser.id,
+          first_name: authUser.user_metadata?.first_name || 'User',
+          last_name: authUser.user_metadata?.last_name || '',
+          email: authUser.email || null,
+          role: 'technician' as const,
+          department: authUser.user_metadata?.department || null,
+          phone: authUser.user_metadata?.phone || null,
+          avatar_url: null,
+          created_at: authUser.created_at || new Date().toISOString(),
+          updated_at: authUser.created_at || new Date().toISOString(),
+        };
+        console.log('Using fallback profile:', fallbackProfile.email);
+        setProfile(fallbackProfile as Profile);
       } else {
-        console.log('Profile loaded:', data?.email);
+        console.log('Profile loaded from DB:', data?.email);
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error in fetchProfile:', error);
+      // Still set a minimal profile to allow app to work
+      setProfile({
+        id: authUser.id,
+        first_name: 'User',
+        last_name: '',
+        email: authUser.email || null,
+        role: 'technician',
+        department: null,
+        phone: null,
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as Profile);
     } finally {
       setLoading(false);
     }
