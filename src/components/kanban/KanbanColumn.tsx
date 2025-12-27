@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { MaintenanceRequest } from '@/utils/mockData';
 import { RequestCard } from './RequestCard';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,8 @@ interface KanbanColumnProps {
   onCardClick?: (request: MaintenanceRequest) => void;
 }
 
-export function KanbanColumn({ id, title, requests, color, onCardClick }: KanbanColumnProps) {
+export const KanbanColumn = forwardRef<HTMLDivElement, KanbanColumnProps>(
+  function KanbanColumn({ id, title, requests, color, onCardClick }, forwardedRef) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -57,4 +59,4 @@ export function KanbanColumn({ id, title, requests, color, onCardClick }: Kanban
       </div>
     </div>
   );
-}
+});

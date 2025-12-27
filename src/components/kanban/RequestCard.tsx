@@ -1,8 +1,9 @@
+import { forwardRef } from 'react';
 import { MaintenanceRequest } from '@/utils/mockData';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst, formatDate } from '@/utils/helpers';
-import { AlertCircle, Calendar, User } from 'lucide-react';
+import { AlertCircle, Calendar } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -11,7 +12,8 @@ interface RequestCardProps {
   onClick?: () => void;
 }
 
-export function RequestCard({ request, onClick }: RequestCardProps) {
+export const RequestCard = forwardRef<HTMLDivElement, RequestCardProps>(
+  function RequestCard({ request, onClick }, forwardedRef) {
   const {
     attributes,
     listeners,
@@ -86,4 +88,4 @@ export function RequestCard({ request, onClick }: RequestCardProps) {
       </div>
     </div>
   );
-}
+});
