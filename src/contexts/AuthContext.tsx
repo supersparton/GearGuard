@@ -24,17 +24,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
       console.log('Initial session:', session?.user?.email || 'No session');
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user);
+        fetchProfile(session.user, isMounted);
       } else {
         setLoading(false);
       }
     }).catch(err => {
+      if (!isMounted) return;
       console.error('Session fetch error:', err);
       setLoading(false);
     });
@@ -42,11 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!isMounted) return;
         console.log('Auth state changed:', _event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user);
+          await fetchProfile(session.user, isMounted);
         } else {
           setProfile(null);
           setLoading(false);
@@ -55,58 +60,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
-  const fetchProfile = async (authUser: User) => {
+  const createFallbackProfile = (authUser: User): Profile => ({
+    id: authUser.id,
+    first_name: authUser.user_metadata?.first_name || 'User',
+    last_name: authUser.user_metadata?.last_name || '',
+    email: authUser.email || null,
+    role: 'technician',
+    department: authUser.user_metadata?.department || null,
+    phone: authUser.user_metadata?.phone || null,
+    avatar_url: null,
+    is_active: true,
+    created_at: authUser.created_at || new Date().toISOString(),
+    updated_at: authUser.created_at || new Date().toISOString(),
+  } as Profile);
+
+  const fetchProfile = async (authUser: User, isMounted: boolean) => {
     try {
       console.log('Fetching profile for:', authUser.id);
 
-      const { data, error } = await supabase
+      // Add timeout to prevent infinite hanging
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .single();
 
-      if (error) {
-        console.warn('Profile fetch failed (RLS?):', error.message);
-        // Create fallback profile from user metadata
-        const fallbackProfile = {
-          id: authUser.id,
-          first_name: authUser.user_metadata?.first_name || 'User',
-          last_name: authUser.user_metadata?.last_name || '',
-          email: authUser.email || null,
-          role: 'technician' as const,
-          department: authUser.user_metadata?.department || null,
-          phone: authUser.user_metadata?.phone || null,
-          avatar_url: null,
-          created_at: authUser.created_at || new Date().toISOString(),
-          updated_at: authUser.created_at || new Date().toISOString(),
-        };
-        console.log('Using fallback profile:', fallbackProfile.email);
-        setProfile(fallbackProfile as Profile);
+      const result = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!isMounted) return;
+
+      if (result && 'data' in result && result.data) {
+        console.log('Profile loaded from DB:', result.data.email);
+        setProfile(result.data);
       } else {
-        console.log('Profile loaded from DB:', data?.email);
-        setProfile(data);
+        console.warn('Profile fetch failed, using fallback');
+        setProfile(createFallbackProfile(authUser));
       }
-    } catch (error) {
-      console.error('Error in fetchProfile:', error);
-      // Still set a minimal profile to allow app to work
-      setProfile({
-        id: authUser.id,
-        first_name: 'User',
-        last_name: '',
-        email: authUser.email || null,
-        role: 'technician',
-        department: null,
-        phone: null,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Profile);
+    } catch (error: any) {
+      if (!isMounted) return;
+      console.warn('Profile fetch error (using fallback):', error?.message);
+      setProfile(createFallbackProfile(authUser));
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   };
 
