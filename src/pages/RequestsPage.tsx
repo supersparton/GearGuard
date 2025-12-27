@@ -54,10 +54,6 @@ export default function RequestsPage() {
       <RequestFormModal 
         open={isFormOpen} 
         onOpenChange={setIsFormOpen}
-        onSubmit={(data) => {
-          console.log('New request:', data);
-          toast.success('Request created successfully');
-        }}
       />
     </Layout>
   );

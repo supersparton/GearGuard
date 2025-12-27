@@ -12,14 +12,18 @@ import {
   LogOut,
   Wrench,
   Factory,
+  Users,
+  Tag,
+  BarChart3,
 } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/requests', icon: Kanban, label: 'Requests' },
+  { to: '/requests', icon: Kanban, label: 'Maintenance' },
+  { to: '/calendar', icon: Calendar, label: 'Calendar' },
   { to: '/equipment', icon: Box, label: 'Equipment' },
   { to: '/work-centers', icon: Factory, label: 'Work Centers' },
-  { to: '/calendar', icon: Calendar, label: 'Calendar' },
+  { to: '/management', icon: Users, label: 'Teams' },
 ];
 
 export function Sidebar() {
@@ -37,7 +41,7 @@ export function Sidebar() {
     <aside className="flex h-screen w-64 flex-col border-r border-border bg-card">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2.5 border-b border-border px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
           <Wrench className="h-5 w-5 text-primary-foreground" />
         </div>
         <span className="text-lg font-bold text-foreground">GearGuard</span>
@@ -45,6 +49,9 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4">
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Main
+        </p>
         {navItems.map((item) => {
           const isActive = location.pathname === item.to;
           return (
@@ -82,7 +89,7 @@ export function Sidebar() {
 
         {/* User section */}
         <div className="mt-4 flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-3">
-          <Avatar className="h-9 w-9">
+          <Avatar className="h-9 w-9 ring-2 ring-primary/20">
             <AvatarImage src={profile?.avatar_url || undefined} />
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
               {initials}
@@ -92,13 +99,13 @@ export function Sidebar() {
             <p className="truncate text-sm font-medium text-foreground">
               {profile?.first_name} {profile?.last_name}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user?.email}
+            <p className="truncate text-xs text-muted-foreground capitalize">
+              {profile?.role || 'User'}
             </p>
           </div>
           <button
             onClick={handleSignOut}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             title="Sign out"
           >
             <LogOut className="h-4 w-4" />

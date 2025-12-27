@@ -1,13 +1,27 @@
 import { Layout } from '@/components/layout/Layout';
-import { StatCard } from '@/components/dashboard/StatCard';
+import { KPICard } from '@/components/dashboard/KPICard';
+import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
+import { MaintenanceChart } from '@/components/dashboard/MaintenanceChart';
 import { RecentRequests } from '@/components/dashboard/RecentRequests';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { useDashboard, useRecentRequests } from '@/hooks/useDashboard';
 import { useCalendarEvents } from '@/hooks/useData';
-import { Box, ClipboardList, AlertTriangle, Clock, Plus, Calendar, Loader2 } from 'lucide-react';
+import { 
+  Box, 
+  ClipboardList, 
+  AlertTriangle, 
+  Clock, 
+  Plus, 
+  Calendar, 
+  Loader2,
+  Users,
+  Wrench,
+  Activity
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
+import { useMemo } from 'react';
 
 function UpcomingEvents() {
   const navigate = useNavigate();
@@ -65,15 +79,89 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { data: stats, isLoading } = useDashboard();
 
+  // Calculate critical equipment (for demo, equipment under maintenance or with critical requests)
+  const criticalEquipmentCount = stats?.under_maintenance_equipment ?? 0;
+  const criticalEquipmentPercent = stats?.total_equipment 
+    ? Math.round((criticalEquipmentCount / stats.total_equipment) * 100) 
+    : 0;
+
+  // Calculate technician load (demo: based on in-progress vs total capacity)
+  const technicianLoad = useMemo(() => {
+    const inProgress = stats?.in_progress_requests ?? 0;
+    const activeUsers = stats?.active_users ?? 1;
+    // Assuming each technician can handle ~5 concurrent tasks
+    const capacity = activeUsers * 5;
+    return Math.min(100, Math.round((inProgress / capacity) * 100));
+  }, [stats]);
+
+  // Generate alerts based on data
+  const alerts = useMemo(() => {
+    const alertsList: Array<{
+      id: string;
+      type: 'critical' | 'warning' | 'info';
+      title: string;
+      description: string;
+      action?: { label: string; href: string };
+    }> = [];
+
+    if ((stats?.critical_open ?? 0) > 0) {
+      alertsList.push({
+        id: 'critical-requests',
+        type: 'critical',
+        title: `${stats?.critical_open} Critical Request${(stats?.critical_open ?? 0) > 1 ? 's' : ''}`,
+        description: 'Immediate attention required for critical priority requests',
+        action: { label: 'View', href: '/requests' },
+      });
+    }
+
+    if ((stats?.overdue_requests ?? 0) > 0) {
+      alertsList.push({
+        id: 'overdue',
+        type: 'warning',
+        title: `${stats?.overdue_requests} Overdue Request${(stats?.overdue_requests ?? 0) > 1 ? 's' : ''}`,
+        description: 'These requests have passed their due date',
+        action: { label: 'View', href: '/requests' },
+      });
+    }
+
+    if ((stats?.high_open ?? 0) > 3) {
+      alertsList.push({
+        id: 'high-requests',
+        type: 'warning',
+        title: `${stats?.high_open} High Priority Requests`,
+        description: 'Consider prioritizing high priority maintenance tasks',
+        action: { label: 'View', href: '/requests' },
+      });
+    }
+
+    if (technicianLoad > 85) {
+      alertsList.push({
+        id: 'technician-load',
+        type: 'info',
+        title: 'High Technician Utilization',
+        description: `Team is at ${technicianLoad}% capacity. Consider redistributing workload.`,
+      });
+    }
+
+    return alertsList;
+  }, [stats, technicianLoad]);
+
+  const chartData = {
+    new: stats?.new_requests ?? 0,
+    in_progress: stats?.in_progress_requests ?? 0,
+    repaired: stats?.repaired_requests ?? 0,
+    scrap: stats?.scrap_requests ?? 0,
+  };
+
   return (
     <Layout>
       <div className="p-6 lg:p-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+            <h1 className="text-2xl font-bold text-foreground">Command Center</h1>
             <p className="mt-1 text-muted-foreground">
-              Welcome back! Here's your maintenance overview.
+              Real-time maintenance operations overview
             </p>
           </div>
           <Button onClick={() => navigate('/requests')} className="gap-2 shadow-sm">
@@ -82,38 +170,105 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Equipment"
-            value={isLoading ? '—' : stats?.total_equipment ?? 0}
-            icon={Box}
-            variant="primary"
-          />
-          <StatCard
-            title="Open Requests"
-            value={isLoading ? '—' : stats?.open_requests ?? 0}
-            icon={ClipboardList}
-            variant="default"
-          />
-          <StatCard
-            title="Overdue"
-            value={isLoading ? '—' : stats?.overdue_requests ?? 0}
+        {/* Primary KPIs - Top Row */}
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KPICard
+            title="Critical Equipment"
+            value={criticalEquipmentCount}
+            subtitle={`${criticalEquipmentPercent}% of total assets`}
             icon={AlertTriangle}
-            variant={(stats?.overdue_requests ?? 0) > 0 ? 'danger' : 'default'}
+            variant={criticalEquipmentCount > 0 ? 'danger' : 'success'}
+            progress={criticalEquipmentPercent}
           />
-          <StatCard
+          <KPICard
+            title="Technician Load"
+            value={`${technicianLoad}%`}
+            subtitle={`${stats?.active_users ?? 0} active technicians`}
+            icon={Users}
+            variant={technicianLoad > 85 ? 'warning' : technicianLoad > 60 ? 'primary' : 'success'}
+            progress={technicianLoad}
+          />
+          <KPICard
+            title="Open Requests"
+            value={stats?.open_requests ?? 0}
+            subtitle={`${stats?.overdue_requests ?? 0} overdue`}
+            icon={ClipboardList}
+            variant={(stats?.overdue_requests ?? 0) > 0 ? 'warning' : 'primary'}
+          />
+          <KPICard
             title="Avg. Repair Time"
-            value={isLoading ? '—' : `${stats?.avg_repair_hours ?? 0}h`}
+            value={`${stats?.avg_repair_hours ?? 0}h`}
+            subtitle="Average completion time"
             icon={Clock}
             variant="success"
           />
         </div>
 
-        {/* Content Grid */}
-        <div className="grid gap-6 lg:grid-cols-2 mb-6">
-          <RecentRequests />
-          <RecentActivity />
+        {/* Secondary Stats - Smaller cards */}
+        <div className="mb-6 grid gap-4 grid-cols-2 sm:grid-cols-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Box className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats?.total_equipment ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Total Equipment</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-success/10 flex items-center justify-center">
+                <Activity className="h-4 w-4 text-success" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats?.active_equipment ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Active</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-warning/10 flex items-center justify-center">
+                <Wrench className="h-4 w-4 text-warning" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats?.under_maintenance_equipment ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Maintenance</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats?.active_teams ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Teams</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-6 lg:grid-cols-3 mb-6">
+          {/* Left: Chart + Alerts */}
+          <div className="space-y-6">
+            <MaintenanceChart data={chartData} isLoading={isLoading} />
+            <AlertsPanel alerts={alerts} isLoading={isLoading} />
+          </div>
+          
+          {/* Center: Recent Requests */}
+          <div className="lg:col-span-1">
+            <RecentRequests />
+          </div>
+          
+          {/* Right: Activity */}
+          <div className="lg:col-span-1">
+            <RecentActivity />
+          </div>
         </div>
 
         {/* Upcoming Events */}
