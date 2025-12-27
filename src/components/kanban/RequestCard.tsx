@@ -1,91 +1,120 @@
-import { forwardRef } from 'react';
-import { MaintenanceRequest } from '@/utils/mockData';
+import { useDraggable } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { capitalizeFirst, formatDate } from '@/utils/helpers';
-import { AlertCircle, Calendar } from 'lucide-react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { AlertCircle, Clock } from 'lucide-react';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { Tables } from '@/integrations/supabase/types';
+
+type Request = Tables<'v_requests'>;
 
 interface RequestCardProps {
-  request: MaintenanceRequest;
+  request: Request;
   onClick?: () => void;
 }
 
-export const RequestCard = forwardRef<HTMLDivElement, RequestCardProps>(
-  function RequestCard({ request, onClick }, forwardedRef) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: request.id });
+const priorityStyles = {
+  low: 'bg-slate-100 text-slate-700 border-slate-200',
+  medium: 'bg-blue-100 text-blue-700 border-blue-200',
+  high: 'bg-orange-100 text-orange-700 border-orange-200',
+  critical: 'bg-red-100 text-red-700 border-red-200',
+};
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+const typeStyles = {
+  corrective: 'bg-amber-50 text-amber-700',
+  preventive: 'bg-emerald-50 text-emerald-700',
+};
+
+export function RequestCard({ request, onClick }: RequestCardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: request.id!,
+  });
+
+  const style = transform
+    ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    }
+    : undefined;
+
+  const initials = request.technician_name
+    ?.split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase() || '?';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
       {...listeners}
+      {...attributes}
       onClick={onClick}
       className={cn(
-        'cursor-grab rounded-lg border bg-card p-4 transition-all duration-200',
-        'hover:shadow-md active:cursor-grabbing',
-        isDragging && 'rotate-2 shadow-lg opacity-90',
-        request.is_overdue ? 'border-l-4 border-l-destructive border-t-border border-r-border border-b-border' : 'border-border'
+        'group cursor-grab rounded-xl border bg-card p-4 shadow-sm transition-all duration-200',
+        'hover:shadow-md hover:border-primary/20',
+        isDragging && 'opacity-50 shadow-lg rotate-2',
+        request.is_overdue && 'border-l-4 border-l-red-500'
       )}
     >
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            {request.request_number}
-          </span>
-          {request.is_overdue && (
-            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-          )}
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground line-clamp-2">{request.subject}</p>
+          <p className="mt-1 text-sm text-muted-foreground truncate">
+            {request.equipment_name}
+          </p>
         </div>
         <Badge
           variant="outline"
-          className={cn(
-            'border-0 text-xs font-medium',
-            request.priority === 'critical' && 'bg-priority-critical/10 text-priority-critical',
-            request.priority === 'high' && 'bg-priority-high/10 text-priority-high',
-            request.priority === 'medium' && 'bg-priority-medium/10 text-priority-medium',
-            request.priority === 'low' && 'bg-priority-low/10 text-priority-low'
-          )}
+          className={cn('shrink-0 text-xs font-medium', priorityStyles[request.priority as keyof typeof priorityStyles])}
         >
-          {capitalizeFirst(request.priority)}
+          {request.priority}
         </Badge>
       </div>
 
-      {/* Content */}
-      <h4 className="mb-2 font-medium text-foreground leading-snug">
-        {request.subject}
-      </h4>
-      <p className="mb-3 text-sm text-muted-foreground">
-        {request.equipment_name}
-      </p>
+      {/* Type Badge */}
+      <div className="mb-3">
+        <Badge variant="secondary" className={cn('text-xs', typeStyles[request.request_type as keyof typeof typeStyles])}>
+          {request.request_type === 'corrective' ? '🔧 Corrective' : '📅 Preventive'}
+        </Badge>
+      </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5" />
-          <span>{formatDate(request.due_date)}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={request.technician_avatar || undefined} />
+            <AvatarFallback className="text-xs bg-primary/10 text-primary">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+            {request.technician_name || 'Unassigned'}
+          </span>
         </div>
+
         <div className="flex items-center gap-1.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-            {request.assigned_technician_name.split(' ').map(n => n[0]).join('')}
-          </div>
+          {request.is_overdue && (
+            <div className="flex items-center gap-1 text-red-600">
+              <AlertCircle className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Overdue</span>
+            </div>
+          )}
+          {!request.is_overdue && request.due_date && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span className="text-xs">
+                {formatDistanceToNow(parseISO(request.due_date), { addSuffix: true })}
+              </span>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Request Number */}
+      <div className="mt-3 pt-3 border-t border-border">
+        <span className="text-xs text-muted-foreground">{request.request_number}</span>
       </div>
     </div>
   );
-});
+}

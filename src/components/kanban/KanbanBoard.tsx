@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MaintenanceRequest, mockRequests } from '@/utils/mockData';
+import { useRequests, useUpdateRequestStage } from '@/hooks/useRequests';
 import { KanbanColumn } from './KanbanColumn';
 import { RequestFormModal } from '@/components/requests/RequestFormModal';
 import { RequestDetailModal } from '@/components/requests/RequestDetailModal';
@@ -15,19 +15,24 @@ import {
 } from '@dnd-kit/core';
 import { RequestCard } from './RequestCard';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
+import { Tables } from '@/integrations/supabase/types';
+
+type Request = Tables<'v_requests'>;
 
 const stages = [
-  { id: 'new', title: 'New', color: 'bg-stage-new' },
-  { id: 'in_progress', title: 'In Progress', color: 'bg-stage-in-progress' },
-  { id: 'repaired', title: 'Repaired', color: 'bg-stage-repaired' },
-  { id: 'scrap', title: 'Scrap', color: 'bg-stage-scrap' },
+  { id: 'new', title: 'New', color: 'bg-blue-500' },
+  { id: 'in_progress', title: 'In Progress', color: 'bg-amber-500' },
+  { id: 'repaired', title: 'Repaired', color: 'bg-green-500' },
+  { id: 'scrap', title: 'Scrap', color: 'bg-slate-500' },
 ];
 
 export function KanbanBoard() {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>(mockRequests);
-  const [activeRequest, setActiveRequest] = useState<MaintenanceRequest | null>(null);
+  const { data: requests = [], isLoading } = useRequests();
+  const updateStage = useUpdateRequestStage();
+  const [activeRequest, setActiveRequest] = useState<Request | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const sensors = useSensors(
@@ -49,7 +54,7 @@ export function KanbanBoard() {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveRequest(null);
 
@@ -58,40 +63,43 @@ export function KanbanBoard() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Check if dropped on a column
     const targetStage = stages.find((s) => s.id === overId);
     if (targetStage) {
       const request = requests.find(r => r.id === activeId);
       if (request && request.stage !== targetStage.id) {
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.id === activeId ? { ...r, stage: targetStage.id as MaintenanceRequest['stage'] } : r
-          )
-        );
-        toast.success(`Request moved to ${targetStage.title}`);
+        try {
+          await updateStage.mutateAsync({ id: activeId, stage: targetStage.id });
+          toast.success(`Request moved to ${targetStage.title}`);
+        } catch (error) {
+          toast.error('Failed to update request');
+        }
       }
     }
   };
 
-  const handleCardClick = (request: MaintenanceRequest) => {
+  const handleCardClick = (request: Request) => {
     setSelectedRequest(request);
     setIsDetailOpen(true);
   };
 
-  const handleStageChange = (requestId: string, newStage: MaintenanceRequest['stage']) => {
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === requestId ? { ...r, stage: newStage } : r
-      )
-    );
-    setSelectedRequest(prev => prev ? { ...prev, stage: newStage } : null);
-    const stageLabel = stages.find(s => s.id === newStage)?.title || newStage;
-    toast.success(`Request moved to ${stageLabel}`);
+  const handleStageChange = async (requestId: string, newStage: string) => {
+    try {
+      await updateStage.mutateAsync({ id: requestId, stage: newStage });
+      setSelectedRequest(prev => prev ? { ...prev, stage: newStage as any } : null);
+      const stageLabel = stages.find(s => s.id === newStage)?.title || newStage;
+      toast.success(`Request moved to ${stageLabel}`);
+    } catch (error) {
+      toast.error('Failed to update request');
+    }
   };
 
-  const handleAddRequest = () => {
-    setIsFormOpen(true);
-  };
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -110,27 +118,23 @@ export function KanbanBoard() {
               color={stage.color}
               requests={getRequestsByStage(stage.id)}
               onCardClick={handleCardClick}
-              onAddRequest={stage.id === 'new' ? handleAddRequest : undefined}
+              onAddRequest={stage.id === 'new' ? () => setIsFormOpen(true) : undefined}
             />
           ))}
         </div>
 
         <DragOverlay>
           {activeRequest && (
-            <div className="rotate-3">
+            <div className="rotate-2 scale-105">
               <RequestCard request={activeRequest} />
             </div>
           )}
         </DragOverlay>
       </DndContext>
 
-      <RequestFormModal 
-        open={isFormOpen} 
+      <RequestFormModal
+        open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        onSubmit={(data) => {
-          console.log('New request:', data);
-          toast.success('Request created successfully');
-        }}
       />
 
       <RequestDetailModal

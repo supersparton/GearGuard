@@ -9,57 +9,76 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { mockEquipment } from '@/utils/mockData';
+import { CalendarIcon, Loader2 } from 'lucide-react';
+import { useEquipment, useEquipmentDefaults } from '@/hooks/useEquipment';
+import { useCreateRequest } from '@/hooks/useRequests';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface RequestFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit?: (data: RequestFormData) => void;
 }
 
-export interface RequestFormData {
-  subject: string;
-  description: string;
-  equipment_id: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  request_type: 'corrective' | 'preventive';
-  due_date: Date | undefined;
-}
+export function RequestFormModal({ open, onOpenChange }: RequestFormModalProps) {
+  const { user } = useAuth();
+  const { data: equipment = [], isLoading: loadingEquipment } = useEquipment();
+  const createRequest = useCreateRequest();
 
-export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormModalProps) {
-  const [formData, setFormData] = useState<RequestFormData>({
+  const [formData, setFormData] = useState({
     subject: '',
     description: '',
     equipment_id: '',
-    priority: 'medium',
-    request_type: 'corrective',
-    due_date: undefined,
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
+    request_type: 'corrective' as 'corrective' | 'preventive',
+    due_date: undefined as Date | undefined,
   });
 
-  // Auto-fill fields based on selected equipment
-  const selectedEquipment = mockEquipment.find(e => e.id === formData.equipment_id);
+  // Auto-fill from equipment defaults
+  const { data: defaults } = useEquipmentDefaults(formData.equipment_id || null);
+  const selectedEquipment = equipment.find(e => e.id === formData.equipment_id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit?.(formData);
-    onOpenChange(false);
-    // Reset form
-    setFormData({
-      subject: '',
-      description: '',
-      equipment_id: '',
-      priority: 'medium',
-      request_type: 'corrective',
-      due_date: undefined,
-    });
+
+    if (!user) {
+      toast.error('You must be logged in');
+      return;
+    }
+
+    try {
+      await createRequest.mutateAsync({
+        subject: formData.subject,
+        description: formData.description || undefined,
+        equipment_id: formData.equipment_id,
+        priority: formData.priority,
+        request_type: formData.request_type,
+        due_date: formData.due_date ? format(formData.due_date, 'yyyy-MM-dd') : undefined,
+        created_by: user.id,
+      });
+
+      toast.success('Request created successfully');
+      onOpenChange(false);
+
+      // Reset form
+      setFormData({
+        subject: '',
+        description: '',
+        equipment_id: '',
+        priority: 'medium',
+        request_type: 'corrective',
+        due_date: undefined,
+      });
+    } catch (error) {
+      toast.error('Failed to create request');
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl">New Maintenance Request</DialogTitle>
+          <DialogTitle className="text-xl font-bold">New Maintenance Request</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -68,13 +87,14 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
             {/* Left Column - Editable Fields */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="subject">Subject</Label>
+                <Label htmlFor="subject">Subject *</Label>
                 <Input
                   id="subject"
                   placeholder="Brief description of the issue"
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                   required
+                  className="h-11"
                 />
               </div>
 
@@ -90,17 +110,17 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="equipment">Equipment</Label>
-                <Select 
-                  value={formData.equipment_id} 
+                <Label htmlFor="equipment">Equipment *</Label>
+                <Select
+                  value={formData.equipment_id}
                   onValueChange={(value) => setFormData({ ...formData, equipment_id: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select equipment" />
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder={loadingEquipment ? 'Loading...' : 'Select equipment'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockEquipment.map((eq) => (
-                      <SelectItem key={eq.id} value={eq.id}>
+                    {equipment.map((eq) => (
+                      <SelectItem key={eq.id} value={eq.id!}>
                         <span className="flex items-center gap-2">
                           <span>{eq.category_icon}</span>
                           <span>{eq.name}</span>
@@ -116,22 +136,30 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
             {/* Right Column - Auto-filled Fields */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Category</Label>
-                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
-                  {selectedEquipment?.category_name || '—'}
+                <Label className="text-muted-foreground">Category (Auto-filled)</Label>
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-sm">
+                  {selectedEquipment?.category_icon && <span>{selectedEquipment.category_icon}</span>}
+                  {defaults?.category_name || selectedEquipment?.category_name || '—'}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Maintenance Team</Label>
-                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
-                  {selectedEquipment?.maintenance_team_name || '—'}
+                <Label className="text-muted-foreground">Maintenance Team (Auto-filled)</Label>
+                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-sm">
+                  {defaults?.team_name || selectedEquipment?.team_name || '—'}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Default Technician (Auto-filled)</Label>
+                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-sm">
+                  {defaults?.technician_name || selectedEquipment?.default_technician_name || '—'}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Location</Label>
-                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
+                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-sm">
                   {selectedEquipment?.location || '—'}
                 </div>
               </div>
@@ -142,37 +170,37 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
           <div className="grid grid-cols-3 gap-4 border-t border-border pt-4">
             <div className="space-y-2">
               <Label>Priority</Label>
-              <Select 
-                value={formData.priority} 
-                onValueChange={(value: 'low' | 'medium' | 'high' | 'critical') => 
+              <Select
+                value={formData.priority}
+                onValueChange={(value: 'low' | 'medium' | 'high' | 'critical') =>
                   setFormData({ ...formData, priority: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-priority-low" />
+                      <span className="h-2 w-2 rounded-full bg-slate-500" />
                       Low
                     </span>
                   </SelectItem>
                   <SelectItem value="medium">
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-priority-medium" />
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
                       Medium
                     </span>
                   </SelectItem>
                   <SelectItem value="high">
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-priority-high" />
+                      <span className="h-2 w-2 rounded-full bg-orange-500" />
                       High
                     </span>
                   </SelectItem>
                   <SelectItem value="critical">
                     <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-priority-critical" />
+                      <span className="h-2 w-2 rounded-full bg-red-500" />
                       Critical
                     </span>
                   </SelectItem>
@@ -187,7 +215,7 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
                   <Button
                     variant="outline"
                     className={cn(
-                      'w-full justify-start text-left font-normal',
+                      'h-11 w-full justify-start text-left font-normal',
                       !formData.due_date && 'text-muted-foreground'
                     )}
                   >
@@ -209,18 +237,18 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
 
             <div className="space-y-2">
               <Label>Type</Label>
-              <Select 
-                value={formData.request_type} 
-                onValueChange={(value: 'corrective' | 'preventive') => 
+              <Select
+                value={formData.request_type}
+                onValueChange={(value: 'corrective' | 'preventive') =>
                   setFormData({ ...formData, request_type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="corrective">Corrective</SelectItem>
-                  <SelectItem value="preventive">Preventive</SelectItem>
+                  <SelectItem value="corrective">🔧 Corrective</SelectItem>
+                  <SelectItem value="preventive">📅 Preventive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -230,7 +258,10 @@ export function RequestFormModal({ open, onOpenChange, onSubmit }: RequestFormMo
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Create Request</Button>
+            <Button type="submit" disabled={createRequest.isPending || !formData.equipment_id}>
+              {createRequest.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create Request
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

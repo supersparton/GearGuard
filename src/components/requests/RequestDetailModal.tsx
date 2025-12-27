@@ -5,56 +5,71 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { capitalizeFirst, formatDate, formatRelativeTime } from '@/utils/helpers';
-import { MaintenanceRequest, mockActivityLog } from '@/utils/mockData';
-import { 
-  AlertCircle, 
-  Calendar, 
-  MapPin, 
-  Wrench, 
-  Tag, 
+import { Tables } from '@/integrations/supabase/types';
+import { formatDistanceToNow, parseISO, format } from 'date-fns';
+import {
+  AlertCircle,
+  Calendar,
+  MapPin,
+  Wrench,
+  Tag,
   ArrowRight,
   CheckCircle,
   XCircle,
   Clock,
   Plus,
-  UserCheck
+  UserCheck,
+  Loader2
 } from 'lucide-react';
+
+type Request = Tables<'v_requests'>;
 
 interface RequestDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  request: MaintenanceRequest | null;
-  onStageChange?: (requestId: string, newStage: MaintenanceRequest['stage']) => void;
+  request: Request | null;
+  onStageChange?: (requestId: string, newStage: string) => void;
 }
 
 const stageConfig = {
-  new: { label: 'New', color: 'bg-stage-new', next: 'in_progress' as const },
-  in_progress: { label: 'In Progress', color: 'bg-stage-in-progress', next: 'repaired' as const },
-  repaired: { label: 'Repaired', color: 'bg-stage-repaired', next: null },
-  scrap: { label: 'Scrap', color: 'bg-stage-scrap', next: null },
+  new: { label: 'New', color: 'bg-blue-500', next: 'in_progress' as const },
+  in_progress: { label: 'In Progress', color: 'bg-amber-500', next: 'repaired' as const },
+  repaired: { label: 'Repaired', color: 'bg-green-500', next: null },
+  scrap: { label: 'Scrap', color: 'bg-slate-500', next: null },
 };
 
-const actionIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  created: Plus,
-  stage_changed: ArrowRight,
-  assigned: UserCheck,
-  completed: CheckCircle,
-  updated: Clock,
-  deleted: XCircle,
+const priorityStyles = {
+  low: 'bg-slate-100 text-slate-700',
+  medium: 'bg-blue-100 text-blue-700',
+  high: 'bg-orange-100 text-orange-700',
+  critical: 'bg-red-100 text-red-700',
 };
 
 export function RequestDetailModal({ open, onOpenChange, request, onStageChange }: RequestDetailModalProps) {
   const [resolutionNotes, setResolutionNotes] = useState('');
+  const [updating, setUpdating] = useState(false);
 
   if (!request) return null;
 
-  const currentStage = stageConfig[request.stage];
-  const activities = mockActivityLog.filter(a => a.entity_id === request.id).slice(0, 5);
+  const currentStage = stageConfig[request.stage as keyof typeof stageConfig] || stageConfig.new;
 
-  const handleStageTransition = (newStage: MaintenanceRequest['stage']) => {
-    onStageChange?.(request.id, newStage);
+  const initials = request.technician_name
+    ?.split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase() || '?';
+
+  const handleStageTransition = async (newStage: string) => {
+    setUpdating(true);
+    await onStageChange?.(request.id!, newStage);
+    setUpdating(false);
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—';
+    return format(parseISO(dateStr), 'MMM d, yyyy');
   };
 
   return (
@@ -70,7 +85,7 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
               </Badge>
             )}
           </div>
-          <DialogTitle className="text-xl">{request.subject}</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{request.subject}</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-5 gap-6 flex-1 overflow-hidden">
@@ -84,6 +99,9 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
                   Equipment
                 </div>
                 <p className="font-medium text-foreground">{request.equipment_name}</p>
+                {request.equipment_serial && (
+                  <p className="text-xs text-muted-foreground font-mono">{request.equipment_serial}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -91,7 +109,7 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
                   <MapPin className="h-4 w-4" />
                   Location
                 </div>
-                <p className="font-medium text-foreground">Building A, Floor 1</p>
+                <p className="font-medium text-foreground">{request.equipment_location || '—'}</p>
               </div>
 
               <div className="space-y-1">
@@ -100,7 +118,7 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
                   Type
                 </div>
                 <Badge variant="outline" className="capitalize">
-                  {request.request_type}
+                  {request.request_type === 'corrective' ? '🔧 Corrective' : '📅 Preventive'}
                 </Badge>
               </div>
 
@@ -109,16 +127,7 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
                   <AlertCircle className="h-4 w-4" />
                   Priority
                 </div>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'border-0 capitalize',
-                    request.priority === 'critical' && 'bg-priority-critical/10 text-priority-critical',
-                    request.priority === 'high' && 'bg-priority-high/10 text-priority-high',
-                    request.priority === 'medium' && 'bg-priority-medium/10 text-priority-medium',
-                    request.priority === 'low' && 'bg-priority-low/10 text-priority-low'
-                  )}
-                >
+                <Badge className={cn('capitalize', priorityStyles[request.priority as keyof typeof priorityStyles])}>
                   {request.priority}
                 </Badge>
               </div>
@@ -147,6 +156,23 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
 
             <Separator />
 
+            {/* Category & Team */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Category</Label>
+                <div className="flex items-center gap-2">
+                  {request.category_icon && <span>{request.category_icon}</span>}
+                  <span>{request.category_name || '—'}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Maintenance Team</Label>
+                <p>{request.team_name || '—'}</p>
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Description */}
             <div className="space-y-2">
               <Label className="text-muted-foreground">Description</Label>
@@ -163,7 +189,7 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
                   id="resolution"
                   placeholder="Add notes about how the issue was resolved..."
                   className="min-h-[100px] resize-none"
-                  value={resolutionNotes}
+                  value={resolutionNotes || request.resolution_notes || ''}
                   onChange={(e) => setResolutionNotes(e.target.value)}
                 />
               </div>
@@ -183,30 +209,33 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
               {/* Stage Transition Buttons */}
               <div className="flex flex-wrap gap-2">
                 {request.stage === 'new' && (
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={() => handleStageTransition('in_progress')}
                     className="gap-1"
+                    disabled={updating}
                   >
-                    <ArrowRight className="h-3 w-3" />
+                    {updating ? <Loader2 className="h-3 w-3 animate-spin" /> : <ArrowRight className="h-3 w-3" />}
                     Start Work
                   </Button>
                 )}
                 {request.stage === 'in_progress' && (
                   <>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       onClick={() => handleStageTransition('repaired')}
-                      className="gap-1 bg-success hover:bg-success/90"
+                      className="gap-1 bg-green-600 hover:bg-green-700"
+                      disabled={updating}
                     >
-                      <CheckCircle className="h-3 w-3" />
+                      {updating ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
                       Mark Repaired
                     </Button>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => handleStageTransition('scrap')}
                       className="gap-1"
+                      disabled={updating}
                     >
                       <XCircle className="h-3 w-3" />
                       Mark as Scrap
@@ -222,39 +251,50 @@ export function RequestDetailModal({ open, onOpenChange, request, onStageChange 
             <div className="space-y-3">
               <Label className="text-muted-foreground">Assigned Technician</Label>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
-                  {request.assigned_technician_name.split(' ').map(n => n[0]).join('')}
-                </div>
-                <span className="font-medium text-foreground">{request.assigned_technician_name}</span>
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={request.technician_avatar || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-medium text-foreground">
+                  {request.technician_name || 'Unassigned'}
+                </span>
               </div>
             </div>
 
             <Separator />
 
-            {/* Activity Timeline */}
+            {/* Duration (if completed) */}
+            {request.duration_hours && (
+              <>
+                <div className="space-y-3">
+                  <Label className="text-muted-foreground">Repair Duration</Label>
+                  <p className="font-medium text-foreground">{request.duration_hours} hours</p>
+                </div>
+                <Separator />
+              </>
+            )}
+
+            {/* Timeline Info */}
             <div className="space-y-3">
-              <Label className="text-muted-foreground">Activity Timeline</Label>
-              <div className="space-y-4">
-                {activities.length > 0 ? activities.map((activity) => {
-                  const Icon = actionIcons[activity.action] || Clock;
-                  return (
-                    <div key={activity.id} className="flex items-start gap-3">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
-                        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 space-y-0.5">
-                        <p className="text-sm text-foreground">
-                          <span className="font-medium">{activity.performed_by_name}</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground">{activity.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatRelativeTime(activity.performed_at)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+              <Label className="text-muted-foreground">Timeline</Label>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Created</span>
+                  <span>{request.created_at && formatDistanceToNow(parseISO(request.created_at), { addSuffix: true })}</span>
+                </div>
+                {request.started_at && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Started</span>
+                    <span>{formatDistanceToNow(parseISO(request.started_at), { addSuffix: true })}</span>
+                  </div>
+                )}
+                {request.completed_at && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Completed</span>
+                    <span>{formatDistanceToNow(parseISO(request.completed_at), { addSuffix: true })}</span>
+                  </div>
                 )}
               </div>
             </div>
