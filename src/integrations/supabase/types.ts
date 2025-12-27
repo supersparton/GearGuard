@@ -94,6 +94,7 @@ export type Database = {
       equipment: {
         Row: {
           category_id: string | null
+          company_name: string | null
           created_at: string | null
           default_technician_id: string | null
           department: string
@@ -104,13 +105,17 @@ export type Database = {
           name: string
           notes: string | null
           purchase_date: string
+          scrap_date: string | null
           serial_number: string
           status: Database["public"]["Enums"]["equipment_status"] | null
           updated_at: string | null
+          used_by_employee_name: string | null
           warranty_expiry: string | null
+          work_center_id: string | null
         }
         Insert: {
           category_id?: string | null
+          company_name?: string | null
           created_at?: string | null
           default_technician_id?: string | null
           department: string
@@ -121,13 +126,17 @@ export type Database = {
           name: string
           notes?: string | null
           purchase_date: string
+          scrap_date?: string | null
           serial_number: string
           status?: Database["public"]["Enums"]["equipment_status"] | null
           updated_at?: string | null
+          used_by_employee_name?: string | null
           warranty_expiry?: string | null
+          work_center_id?: string | null
         }
         Update: {
           category_id?: string | null
+          company_name?: string | null
           created_at?: string | null
           default_technician_id?: string | null
           department?: string
@@ -138,10 +147,13 @@ export type Database = {
           name?: string
           notes?: string | null
           purchase_date?: string
+          scrap_date?: string | null
           serial_number?: string
           status?: Database["public"]["Enums"]["equipment_status"] | null
           updated_at?: string | null
+          used_by_employee_name?: string | null
           warranty_expiry?: string | null
+          work_center_id?: string | null
         }
         Relationships: [
           {
@@ -172,6 +184,13 @@ export type Database = {
             referencedRelation: "v_teams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "equipment_work_center_id_fkey"
+            columns: ["work_center_id"]
+            isOneToOne: false
+            referencedRelation: "work_centers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       maintenance_requests: {
@@ -195,7 +214,9 @@ export type Database = {
           stage: Database["public"]["Enums"]["request_stage"] | null
           started_at: string | null
           subject: string
+          target_type: string | null
           updated_at: string | null
+          work_center_id: string | null
         }
         Insert: {
           assigned_technician_id?: string | null
@@ -217,7 +238,9 @@ export type Database = {
           stage?: Database["public"]["Enums"]["request_stage"] | null
           started_at?: string | null
           subject: string
+          target_type?: string | null
           updated_at?: string | null
+          work_center_id?: string | null
         }
         Update: {
           assigned_technician_id?: string | null
@@ -239,7 +262,9 @@ export type Database = {
           stage?: Database["public"]["Enums"]["request_stage"] | null
           started_at?: string | null
           subject?: string
+          target_type?: string | null
           updated_at?: string | null
+          work_center_id?: string | null
         }
         Relationships: [
           {
@@ -291,6 +316,13 @@ export type Database = {
             referencedRelation: "v_teams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "maintenance_requests_work_center_id_fkey"
+            columns: ["work_center_id"]
+            isOneToOne: false
+            referencedRelation: "work_centers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       maintenance_teams: {
@@ -319,6 +351,68 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          related_request_id: string | null
+          title: string
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          related_request_id?: string | null
+          title: string
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          related_request_id?: string | null
+          title?: string
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_request_id_fkey"
+            columns: ["related_request_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_request_id_fkey"
+            columns: ["related_request_id"]
+            isOneToOne: false
+            referencedRelation: "v_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_request_id_fkey"
+            columns: ["related_request_id"]
+            isOneToOne: false
+            referencedRelation: "v_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -407,6 +501,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      work_centers: {
+        Row: {
+          capacity_efficiency: number | null
+          code: string | null
+          cost_per_hour: number | null
+          created_at: string | null
+          id: string
+          name: string
+          oee_target: number | null
+          tag: string | null
+        }
+        Insert: {
+          capacity_efficiency?: number | null
+          code?: string | null
+          cost_per_hour?: number | null
+          created_at?: string | null
+          id?: string
+          name: string
+          oee_target?: number | null
+          tag?: string | null
+        }
+        Update: {
+          capacity_efficiency?: number | null
+          code?: string | null
+          cost_per_hour?: number | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          oee_target?: number | null
+          tag?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
