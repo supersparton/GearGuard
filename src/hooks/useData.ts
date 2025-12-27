@@ -63,10 +63,31 @@ export function useTeamMembers(teamId: string | null) {
             if (!teamId) return [];
 
             const { data, error } = await supabase
-                .rpc('get_team_members', { p_team_id: teamId });
+                .from('team_members')
+                .select(`
+                    id,
+                    role,
+                    joined_at,
+                    user_id,
+                    profiles!team_members_user_id_fkey (
+                        first_name,
+                        last_name,
+                        email
+                    )
+                `)
+                .eq('team_id', teamId);
 
             if (error) throw error;
-            return data ?? [];
+
+            // Transform to flat structure
+            return (data || []).map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                joined_at: m.joined_at,
+                user_id: m.user_id,
+                member_name: m.profiles ? `${m.profiles.first_name || ''} ${m.profiles.last_name || ''}`.trim() : 'Unknown',
+                member_email: m.profiles?.email || ''
+            }));
         },
         enabled: !!teamId,
     });
