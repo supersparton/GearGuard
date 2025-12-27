@@ -5,37 +5,28 @@ The Ultimate Maintenance Tracker for equipment and work centers.
 ## 📁 Project Structure
 
 ```
-gearguard/
-├── frontend/          # React + Vite + TypeScript
-│   ├── src/
-│   │   ├── components/    # UI components
-│   │   ├── contexts/      # React contexts (Auth)
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── pages/         # Page components
-│   │   └── integrations/  # Supabase client
-│   ├── public/            # Static assets
-│   └── package.json
-│
-├── backend/           # Backend configuration
-│   ├── supabase/          # Supabase config
-│   └── sql/               # Database scripts
-│
-└── README.md
+GearGuard/
+├── src/
+│   ├── components/      # UI components
+│   ├── contexts/        # React contexts (Auth)
+│   ├── hooks/           # Custom React hooks
+│   ├── pages/           # Page components
+│   └── integrations/    # Supabase client
+├── public/              # Static assets
+└── package.json
 ```
 
 ## 🚀 Getting Started
 
-### Frontend Setup
-
 ```bash
-cd frontend
+cd GearGuard
 npm install
 npm run dev
 ```
 
-### Environment Variables
+## 🔑 Environment Variables
 
-Create `frontend/.env`:
+Create `.env` in the GearGuard folder:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_anon_key
