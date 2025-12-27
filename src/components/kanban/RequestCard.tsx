@@ -2,7 +2,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { AlertCircle, Clock } from 'lucide-react';
+import { AlertCircle, Clock, Eye } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -18,6 +18,13 @@ const priorityStyles = {
   medium: 'bg-blue-100 text-blue-700 border-blue-200',
   high: 'bg-orange-100 text-orange-700 border-orange-200',
   critical: 'bg-red-100 text-red-700 border-red-200',
+};
+
+const stageColors = {
+  new: 'border-l-blue-500',
+  in_progress: 'border-l-amber-500',
+  repaired: 'border-l-green-500',
+  scrap: 'border-l-slate-400',
 };
 
 const typeStyles = {
@@ -42,44 +49,49 @@ export function RequestCard({ request, onClick }: RequestCardProps) {
     .join('')
     .toUpperCase() || '?';
 
+  const stageColor = stageColors[request.stage as keyof typeof stageColors] || 'border-l-slate-300';
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      onClick={onClick}
       className={cn(
-        'group cursor-grab rounded-xl border bg-card p-4 shadow-sm transition-all duration-200',
+        'group cursor-grab rounded-xl border border-l-4 bg-card p-4 shadow-sm transition-all duration-200',
         'hover:shadow-md hover:border-primary/20',
+        stageColor,
         isDragging && 'opacity-50 shadow-lg rotate-2',
-        request.is_overdue && 'border-l-4 border-l-red-500'
+        request.is_overdue && 'ring-2 ring-red-200'
       )}
     >
-      {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-2">
+      {/* Header - Category Icon + Subject */}
+      <div className="mb-3 flex items-start gap-2">
+        {request.category_icon && (
+          <span className="text-lg shrink-0">{request.category_icon}</span>
+        )}
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground line-clamp-2">{request.subject}</p>
           <p className="mt-1 text-sm text-muted-foreground truncate">
             {request.equipment_name}
           </p>
         </div>
+      </div>
+
+      {/* Badges Row */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge
           variant="outline"
-          className={cn('shrink-0 text-xs font-medium', priorityStyles[request.priority as keyof typeof priorityStyles])}
+          className={cn('text-xs font-medium', priorityStyles[request.priority as keyof typeof priorityStyles])}
         >
           {request.priority}
         </Badge>
-      </div>
-
-      {/* Type Badge */}
-      <div className="mb-3">
         <Badge variant="secondary" className={cn('text-xs', typeStyles[request.request_type as keyof typeof typeStyles])}>
           {request.request_type === 'corrective' ? '🔧 Corrective' : '📅 Preventive'}
         </Badge>
       </div>
 
-      {/* Footer */}
+      {/* Assignee + Due */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
@@ -88,7 +100,7 @@ export function RequestCard({ request, onClick }: RequestCardProps) {
               {initials}
             </AvatarFallback>
           </Avatar>
-          <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+          <span className="text-xs text-muted-foreground truncate max-w-[80px]">
             {request.technician_name || 'Unassigned'}
           </span>
         </div>
@@ -111,9 +123,19 @@ export function RequestCard({ request, onClick }: RequestCardProps) {
         </div>
       </div>
 
-      {/* Request Number */}
-      <div className="mt-3 pt-3 border-t border-border">
-        <span className="text-xs text-muted-foreground">{request.request_number}</span>
+      {/* Footer - Request Number + View Details */}
+      <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+        <span className="text-xs text-muted-foreground font-mono">{request.request_number}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.();
+          }}
+          className="flex items-center gap-1 text-xs text-primary hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Eye className="h-3 w-3" />
+          View Details
+        </button>
       </div>
     </div>
   );
