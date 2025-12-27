@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useCalendarEvents } from '@/hooks/useData';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
@@ -53,10 +54,12 @@ function EventBar({ event }: { event: CalendarEvent }) {
 }
 
 export default function CalendarPage() {
+  const { profile } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: events = [], isLoading } = useCalendarEvents();
+  const isTechnician = profile?.role === 'technician';
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -77,6 +80,8 @@ export default function CalendarPage() {
   const goToToday = () => setCurrentDate(new Date());
 
   const handleDayClick = (date: Date, dayEvents: CalendarEvent[]) => {
+    // Technicians cannot create new requests from calendar
+    if (isTechnician) return;
     if (dayEvents.length === 0) {
       setIsFormOpen(true);
     }
@@ -90,13 +95,15 @@ export default function CalendarPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
             <p className="mt-1 text-muted-foreground">
-              Schedule and track maintenance activities
+              {isTechnician ? 'View scheduled maintenance activities' : 'Schedule and track maintenance activities'}
             </p>
           </div>
-          <Button className="gap-2 shadow-sm" onClick={() => setIsFormOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Schedule Maintenance
-          </Button>
+          {!isTechnician && (
+            <Button className="gap-2 shadow-sm" onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Schedule Maintenance
+            </Button>
+          )}
         </div>
 
         {/* Calendar Navigation */}

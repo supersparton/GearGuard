@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRequests, useUpdateRequestStage } from '@/hooks/useRequests';
+import { useAuth } from '@/contexts/AuthContext';
 import { KanbanColumn } from './KanbanColumn';
 import { RequestFormModal } from '@/components/requests/RequestFormModal';
 import { RequestDetailModal } from '@/components/requests/RequestDetailModal';
@@ -28,12 +29,15 @@ const stages = [
 ];
 
 export function KanbanBoard() {
+  const { profile } = useAuth();
   const { data: requests = [], isLoading } = useRequests();
   const updateStage = useUpdateRequestStage();
   const [activeRequest, setActiveRequest] = useState<Request | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  const isTechnician = profile?.role === 'technician';
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -118,7 +122,7 @@ export function KanbanBoard() {
               color={stage.color}
               requests={getRequestsByStage(stage.id)}
               onCardClick={handleCardClick}
-              onAddRequest={stage.id === 'new' ? () => setIsFormOpen(true) : undefined}
+              onAddRequest={!isTechnician && stage.id === 'new' ? () => setIsFormOpen(true) : undefined}
             />
           ))}
         </div>

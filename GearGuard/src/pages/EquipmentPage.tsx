@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useEquipment } from '@/hooks/useEquipment';
 import { useCategories } from '@/hooks/useData';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +70,7 @@ function StatusBadge({ status }: { status: string | null }) {
 
 export default function EquipmentPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -76,6 +78,8 @@ export default function EquipmentPage() {
 
   const { data: equipment = [], isLoading } = useEquipment();
   const { data: categories = [] } = useCategories();
+
+  const isTechnician = profile?.role === 'technician';
 
   const filteredEquipment = equipment.filter((e) => {
     const matchesSearch =
@@ -97,13 +101,15 @@ export default function EquipmentPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Equipment</h1>
             <p className="mt-1 text-muted-foreground">
-              Manage and track all your equipment
+              {isTechnician ? 'View equipment inventory' : 'Manage and track all your equipment'}
             </p>
           </div>
-          <Button className="gap-2 shadow-sm" onClick={() => setIsFormOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Add Equipment
-          </Button>
+          {!isTechnician && (
+            <Button className="gap-2 shadow-sm" onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add Equipment
+            </Button>
+          )}
         </div>
 
         {/* Search & Filter Bar */}
@@ -213,11 +219,15 @@ export default function EquipmentPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>Create Request</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
+                          {!isTechnician && (
+                            <>
+                              <DropdownMenuItem>Edit</DropdownMenuItem>
+                              <DropdownMenuItem>Create Request</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

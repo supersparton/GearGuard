@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
@@ -6,22 +7,72 @@ import { RecentRequests } from '@/components/dashboard/RecentRequests';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { useDashboard, useRecentRequests } from '@/hooks/useDashboard';
 import { useCalendarEvents } from '@/hooks/useData';
-import { 
-  Box, 
-  ClipboardList, 
-  AlertTriangle, 
-  Clock, 
-  Plus, 
-  Calendar, 
+import { useAuth } from '@/contexts/AuthContext';
+import { KanbanBoard } from '@/components/kanban/KanbanBoard';
+import { RequestFormModal } from '@/components/requests/RequestFormModal';
+import { Input } from '@/components/ui/input';
+import {
+  Box,
+  ClipboardList,
+  AlertTriangle,
+  Clock,
+  Plus,
+  Calendar,
   Loader2,
   Users,
   Wrench,
-  Activity
+  Activity,
+  Search,
+  Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
 import { useMemo } from 'react';
+
+// Technician Dashboard - Kanban View (can edit status, but not create new)
+function TechnicianDashboard() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const { profile } = useAuth();
+
+  return (
+    <Layout>
+      <div className="flex h-full flex-col p-6 lg:p-8">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">
+            Welcome, {profile?.first_name || 'Technician'}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Manage your assigned maintenance requests
+          </p>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="mb-6 flex items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search requests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" className="gap-2">
+            <Filter className="h-4 w-4" />
+            Filters
+          </Button>
+        </div>
+
+        {/* Kanban Board - Technicians can drag/drop to change status */}
+        <div className="flex-1 overflow-hidden">
+          <KanbanBoard />
+        </div>
+      </div>
+    </Layout>
+  );
+}
 
 function UpcomingEvents() {
   const navigate = useNavigate();
@@ -77,12 +128,18 @@ function UpcomingEvents() {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { data: stats, isLoading } = useDashboard();
+
+  // Technicians see only the Kanban board
+  if (profile?.role === 'technician') {
+    return <TechnicianDashboard />;
+  }
 
   // Calculate critical equipment (for demo, equipment under maintenance or with critical requests)
   const criticalEquipmentCount = stats?.under_maintenance_equipment ?? 0;
-  const criticalEquipmentPercent = stats?.total_equipment 
-    ? Math.round((criticalEquipmentCount / stats.total_equipment) * 100) 
+  const criticalEquipmentPercent = stats?.total_equipment
+    ? Math.round((criticalEquipmentCount / stats.total_equipment) * 100)
     : 0;
 
   // Calculate technician load (demo: based on in-progress vs total capacity)
@@ -259,12 +316,12 @@ export default function DashboardPage() {
             <MaintenanceChart data={chartData} isLoading={isLoading} />
             <AlertsPanel alerts={alerts} isLoading={isLoading} />
           </div>
-          
+
           {/* Center: Recent Requests */}
           <div className="lg:col-span-1">
             <RecentRequests />
           </div>
-          
+
           {/* Right: Activity */}
           <div className="lg:col-span-1">
             <RecentActivity />
